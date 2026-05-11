@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 # Импортировать config и Base
-from src.library_catalog.core.config import settings
-from src.library_catalog.core.database import Base
+from library_catalog.src.library_catalog.core.config import settings
+from library_catalog.src.library_catalog.core.database import Base
 
 # Импортировать все модели (ОБЯЗАТЕЛЬНО!)
 from src.library_catalog.data.models import book  # noqa
