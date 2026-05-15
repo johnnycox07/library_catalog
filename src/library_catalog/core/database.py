@@ -2,8 +2,7 @@ from typing import AsyncGenerator
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
-from library_catalog.src.library_catalog.core.config import settings
-
+from .config import settings
 
 class Base(DeclarativeBase):
     pass

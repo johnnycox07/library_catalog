@@ -121,86 +121,86 @@ class BookService:
         if not deleted:
             raise BookNotFoundException(book_id)
 
-        async def search_books(
-                self,
-                title: str | None = None,
-                author: str | None = None,
-                genre: str | None = None,
-                year: int | None = None,
-                available: bool | None = None,
-                limit: int = 20,
-                offset: int = 0,
-        ) -> tuple[list[ShowBook], int]:
-            """
-            Поиск книг с фильтрацией и пагинацией.
+    async def search_books(
+            self,
+            title: str | None = None,
+            author: str | None = None,
+            genre: str | None = None,
+            year: int | None = None,
+            available: bool | None = None,
+            limit: int = 20,
+            offset: int = 0,
+    ) -> tuple[list[ShowBook], int]:
+        """
+        Поиск книг с фильтрацией и пагинацией.
 
-            Returns:
-                tuple: (список книг, общее количество)
-            """
-            # Получить книги
-            books = await self.book_repo.count_by_filters(
-                title=title,
-                author=author,
-                genre=genre,
-                year=year,
-                available=available,
-                limit=limit,
-                offset=offset,
+        Returns:
+            tuple: (список книг, общее количество)
+        """
+        # Получить книги
+        books = await self.book_repo.count_by_filters(
+            title=title,
+            author=author,
+            genre=genre,
+            year=year,
+            available=available,
+            limit=limit,
+            offset=offset,
+        )
+
+        # Подсчитать общее количество
+        total = await self.book_repo.count_by_filters(
+            title=title,
+            author=author,
+            genre=genre,
+            year=year,
+            available=available,
+        )
+
+        return BookMapper.to_show_books(books), total
+
+    # ========== ПРИВАТНЫЕ МЕТОДЫ ==========
+
+    def _validate_book_data(self, data: BookCreate) -> None:
+        """Валидация бизнес-правил для новой книги."""
+        self._validate_year(data.year)
+        self._validate_pages(data.pages)
+
+    def _validate_year(self, year: int) -> None:
+        """Проверить что год валиден."""
+        from datetime import datetime
+
+        current_year = datetime.now().year
+        if year < 1000 or year > current_year:
+            raise InvalidYearException(year)
+
+    def _validate_pages(self, pages: int) -> None:
+        """Проверить что количество страниц валидно."""
+        if pages <= 0:
+            raise InvalidPagesException(pages)
+
+    async def _enrich_book_data(
+            self,
+            book_data: BookCreate
+    ) -> dict | None:
+        """
+        Обогатить данные книги из Open Library.
+
+        Не выбрасывает исключение если API недоступен.
+        """
+        try:
+            extra = await self.ol_client.enrich(
+                title=book_data.title,
+                author=book_data.author,
+                isbn=book_data.isbn,
             )
-
-            # Подсчитать общее количество
-            total = await self.book_repo.count_by_filters(
-                title=title,
-                author=author,
-                genre=genre,
-                year=year,
-                available=available,
+            return extra if extra else None
+        except OpenLibraryTimeoutException:
+            # Логируем но не прерываем создание книги
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "Failed to enrich book data from Open Library",
+                extra={"title": book_data.title, "author": book_data.author}
             )
-
-            return BookMapper.to_show_books(books), total
-
-        # ========== ПРИВАТНЫЕ МЕТОДЫ ==========
-
-        def _validate_book_data(self, data: BookCreate) -> None:
-            """Валидация бизнес-правил для новой книги."""
-            self._validate_year(data.year)
-            self._validate_pages(data.pages)
-
-        def _validate_year(self, year: int) -> None:
-            """Проверить что год валиден."""
-            from datetime import datetime
-
-            current_year = datetime.now().year
-            if year < 1000 or year > current_year:
-                raise InvalidYearException(year)
-
-        def _validate_pages(self, pages: int) -> None:
-            """Проверить что количество страниц валидно."""
-            if pages <= 0:
-                raise InvalidPagesException(pages)
-
-        async def _enrich_book_data(
-                self,
-                book_data: BookCreate
-        ) -> dict | None:
-            """
-            Обогатить данные книги из Open Library.
-
-            Не выбрасывает исключение если API недоступен.
-            """
-            try:
-                extra = await self.ol_client.enrich(
-                    title=book_data.title,
-                    author=book_data.author,
-                    isbn=book_data.isbn,
-                )
-                return extra if extra else None
-            except OpenLibraryTimeoutException:
-                # Логируем но не прерываем создание книги
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(
-                    "Failed to enrich book data from Open Library",
-                    extra={"title": book_data.title, "author": book_data.author}
-                )
-                return None
+            return None
